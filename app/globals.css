@@ -1,0 +1,289 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   LifeBook 设计令牌 · Art Direction 2.0
+   风格关键词：温暖生活感 / 电影感 / 轻玻璃拟态 / 呼吸感留白 / 柔和渐变
+   参考：Apple 商业广告质感 + Editorial 杂志排版 + Cinematic 电影调色
+   ============================================================ */
+
+:root {
+  /* ---- 主色（静蓝） ---- */
+  --color-primary: #5b8def;
+  --color-primary-light: #7da3f3;
+  --color-primary-dark: #2f5fd0;
+  --color-secondary: #6c7ba0;
+
+  /* 点缀 / 状态 */
+  --color-accent: #ff8a65;   /* 珊瑚橙：点赞 / 强调 */
+  --color-success: #34c759;
+  --color-warning: #ffb020;
+  --color-error: #ff453a;
+  --color-info: #5ac8fa;
+
+  /* 背景（奶油白，暖调护眼） */
+  --color-bg-base: #faf9f6;
+  --color-bg-card: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #f3f1ec;
+
+  /* 多层背景氛围（米白 → 暖灰 / 奶油白 → 浅蓝 / 浅粉 → 暖白） */
+  --app-bg: linear-gradient(
+    180deg,
+    #fbfaf7 0%,
+    #f7f5f0 42%,
+    #f5f6fb 100%
+  );
+
+  /* 文字 */
+  --color-text-primary: #1a1c21;
+  --color-text-secondary: #5a6072;
+  --color-text-tertiary: #8b93a7;
+  --color-text-disabled: #c5cad4;
+  --color-text-inverse: #ffffff;
+
+  /* 边框 / 分割线 */
+  --color-border: #e9e6df;
+  --color-divider: #f0ede6;
+
+  /* 玻璃拟态 */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+
+  /* 字体 */
+  --font-sans: var(--font-inter, "Inter"), "HarmonyOS Sans SC", "HarmonyOS Sans",
+    "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+    "SF Pro Display", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC",
+    "STSong", serif;
+  --font-mono: "SF Mono", "SFMono-Regular", "JetBrains Mono", "Fira Code",
+    ui-monospace, monospace;
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* 圆角（Editorial 大圆角） */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* 阴影（浅色暖调，绝不用硬黑影） */
+  --shadow-sm: 0 1px 2px rgba(80, 70, 60, 0.04);
+  --shadow-md: 0 4px 16px rgba(80, 70, 60, 0.07);
+  --shadow-lg: 0 8px 28px rgba(80, 70, 60, 0.1);
+  --shadow-xl: 0 16px 48px rgba(80, 70, 60, 0.14);
+
+  /* 卡片专属柔光 + 悬停扩散 */
+  --shadow-card: 0 2px 6px rgba(80, 70, 60, 0.04), 0 12px 32px rgba(80, 70, 60, 0.07);
+  --shadow-card-hover: 0 6px 16px rgba(80, 70, 60, 0.06), 0 24px 56px rgba(80, 70, 60, 0.12);
+  --shadow-soft: 0 6px 20px rgba(80, 70, 60, 0.06);
+
+  /* 主色辉光（按钮 / 强调） */
+  --shadow-glow: 0 8px 24px rgba(91, 141, 239, 0.32);
+  --shadow-glow-lg: 0 10px 32px rgba(122, 108, 240, 0.4);
+}
+
+/* ---- 深色模式 ---- */
+.dark {
+  --color-primary: #6a9bf4;
+  --color-primary-light: #8ab2f7;
+  --color-primary-dark: #4d7fe0;
+
+  --color-secondary: #8a94ad;
+  --color-accent: #ff8a65;
+  --color-success: #34c759;
+  --color-warning: #ffb020;
+  --color-error: #ff453a;
+  --color-info: #5ac8fa;
+
+  --color-bg-base: #101116;
+  --color-bg-card: #16181d;
+  --color-bg-elevated: #1c1f26;
+  --color-bg-hover: #23262e;
+
+  --app-bg: linear-gradient(
+    180deg,
+    #101116 0%,
+    #0e1015 50%,
+    #12141c 100%
+  );
+
+  --color-text-primary: #f2f4f8;
+  --color-text-secondary: #a7aebd;
+  --color-text-tertiary: #6c7280;
+  --color-text-disabled: #3e434d;
+  --color-text-inverse: #ffffff;
+
+  --color-border: #2a2e38;
+  --color-divider: #23262e;
+
+  --glass-bg: rgba(22, 24, 29, 0.72);
+  --glass-bg-strong: rgba(22, 24, 29, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.4), 0 24px 56px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 8px 24px rgba(106, 155, 244, 0.28);
+  --shadow-glow-lg: 0 10px 32px rgba(122, 108, 240, 0.36);
+}
+
+/* ---- 阅读器主题（用户可选，覆盖 reader 容器） ---- */
+.reader-paper {
+  --reader-bg: #fdfcf8;
+  --reader-fg: #1a1c21;
+  --reader-secondary: #6b7280;
+}
+.reader-green {
+  --reader-bg: #c7edcc;
+  --reader-fg: #1f3b2a;
+  --reader-secondary: #4b6b56;
+}
+.reader-sepia {
+  --reader-bg: #f5f0e1;
+  --reader-fg: #5c4b37;
+  --reader-secondary: #8a7355;
+}
+.reader-dark {
+  --reader-bg: #0f1115;
+  --reader-fg: #c8c0b8;
+  --reader-secondary: #8b837c;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply text-foreground font-sans antialiased;
+    background: var(--app-bg);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(91, 141, 239, 0.25);
+  }
+  /* 数字使用等宽数字特性 */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* ---- 多层背景氛围层 ---- */
+  /* 第 2/3 层：大尺寸模糊色块（浅橙 / 浅蓝 / 浅紫 / 浅绿，低透明度） */
+  .bg-atmosphere {
+    background:
+      radial-gradient(42% 42% at 12% 16%, rgba(255, 166, 128, 0.12), transparent 62%),
+      radial-gradient(38% 38% at 85% 10%, rgba(110, 150, 240, 0.12), transparent 62%),
+      radial-gradient(46% 46% at 86% 78%, rgba(150, 180, 250, 0.10), transparent 62%),
+      radial-gradient(40% 40% at 18% 88%, rgba(190, 225, 190, 0.10), transparent 62%);
+  }
+  .dark .bg-atmosphere {
+    background:
+      radial-gradient(42% 42% at 12% 16%, rgba(255, 140, 100, 0.06), transparent 62%),
+      radial-gradient(38% 38% at 85% 10%, rgba(80, 120, 220, 0.08), transparent 62%),
+      radial-gradient(46% 46% at 86% 78%, rgba(120, 150, 230, 0.06), transparent 62%),
+      radial-gradient(40% 40% at 18% 88%, rgba(120, 200, 150, 0.05), transparent 62%);
+  }
+  /* 第 1 层：颗粒噪点（2-4% 不透明度） */
+  .grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
+  }
+
+  /* ---- 玻璃拟态 ---- */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+  }
+  .glass-strong {
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* ---- 隐藏滚动条（横向分类 / 标签栏） ---- */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ---- 细滚动条（侧边栏） ---- */
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: var(--color-text-disabled);
+  }
+  .thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* ---- 骨架屏微光 ---- */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    animation: shimmer 1.5s infinite;
+  }
+  .dark .shimmer::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}

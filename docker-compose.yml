@@ -1,0 +1,64 @@
+# LifeBook 一键启动：PostgreSQL + Redis + NestJS API + Next.js Web
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lifebook-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lifebook
+      POSTGRES_PASSWORD: lifebook
+      POSTGRES_DB: lifebook
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: lifebook-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./server
+    container_name: lifebook-api
+    restart: unless-stopped
+    env_file: ./server/.env
+    environment:
+      DATABASE_URL: postgresql://lifebook:lifebook@db:5432/lifebook?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+
+  web:
+    build: .
+    container_name: lifebook-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
+  redis_data:

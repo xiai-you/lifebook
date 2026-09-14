@@ -1,0 +1,391 @@
+// ============================================================
+// LifeBook 数据模型 —— 单一事实来源
+// 与前端 types/index.ts 一一对应；前端 API 层契约由本模型映射而来。
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- 枚举（SQLite 不支持 Prisma enum，已改为字符串常量，见 src/common/enums.ts） ----------
+
+// ---------- 用户与作者 ----------
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  nickname     String
+  avatar       String?
+  coverImage   String?
+  bio          String?
+  region       String?
+  country      String?
+  gender       String    @default("SECRET")
+  role         String    @default("AUTHOR")
+
+  // 认证
+  passwordHash String?
+  oauthProvider String? // wechat / apple
+  oauthId      String?
+  email        String?   @unique
+
+  // 兴趣与人生标签（SQLite 存 JSON 字符串，读取时由序列化层解析）
+  interests    String  @default("[]")
+  tags         String  @default("[]")
+  // 用户设置（主题/语言/通知偏好/阅读偏好，JSON 字符串）
+  settings     String  @default("{}")
+
+  // 创作天数（自注册起）
+  createdDays  Int       @default(0)
+
+  // 关系
+  works        Work[]
+  comments     Comment[]
+  likes        Like[]
+  collections  Collection[]
+  resonates    Resonate[]
+  notifications Notification[] @relation("notify_to")
+  sentNotifications Notification[] @relation("notify_actor")
+  shelfItems   ShelfItem[]
+  drafts       Draft[]
+  aiConversations AiConversation[]
+  following    Follow[]   @relation("following")
+  followers    Follow[]   @relation("followers")
+  conversationsA Conversation[] @relation("conv_user_a")
+  conversationsB Conversation[] @relation("conv_user_b")
+  messages     Message[]
+  commentLikes CommentLike[]
+  bookmarks    Bookmark[]
+  highlights   Highlight[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([nickname])
+  @@unique([oauthProvider, oauthId])
+}
+
+// 关注关系（自关联）
+model Follow {
+  followerId  String
+  followingId String
+  follower    User   @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User   @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([followerId, followingId])
+}
+
+// ---------- 作品 ----------
+
+model Work {
+  id          String    @id @default(cuid())
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  title       String
+  subtitle    String?
+  summary     String
+  coverImage  String?
+  coverColor  String?
+
+  categoryL1  String
+  categoryL2  String
+  categoryL3  String?
+  emotion     String?
+  city        String?
+  country     String?
+
+  // 内容模型（编辑排版核心）
+  format      String    @default("MEMOIR") // 内容形式：MEMOIR/DIARY/LETTER/PHOTO_STORY/...
+  excerpt     String?   // 故事摘录（作者原文的一句话）
+  lifeStage   String?   // 人生阶段：童年/青春/大学/初入社会/成年/成家/中年/晚年
+  occupation  String?   // 职业
+  storySource String    @default("AUTHOR_WRITTEN") // 真实来源：作者撰写/口述整理/AI辅助/作者照片
+  year        String?   // 故事发生年份
+
+  // 首页内容形态（生活流混合排版）
+  feedKind     String    @default("ESSAY") // PHOTO/ESSAY/NOVEL
+  momentLabel  String?   // 人生印记标签，如「2019 · 第一次离家」
+  featuredLine String?   // 一句金句（卡片引用）
+
+  totalWords  Int       @default(0)
+  chapterCount Int      @default(0)
+  status      String    @default("ONGOING")
+  visibility  String    @default("PUBLIC")
+  coverRatio  String    @default("RATIO_16_9")
+
+  // 计数（高频读，可后续用 Redis 缓存 / 物化视图）
+  viewCount    Int       @default(0)
+  likeCount    Int       @default(0)
+  collectCount Int       @default(0)
+  commentCount Int       @default(0)
+  resonateCount Int      @default(0)
+  readMinutes  Int       @default(5)
+
+  publishAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chapters    Chapter[]
+  comments    Comment[]
+  tags        Tag[]
+  likes       Like[]
+  collections Collection[]
+  resonates   Resonate[]
+  notifications Notification[]
+  messages    Message[]
+  shelfItems  ShelfItem[]
+  bookmarks   Bookmark[]
+  highlights  Highlight[]
+  insight     WorkAi?
+
+  @@index([authorId])
+  @@index([categoryL1, categoryL2])
+  @@index([status, visibility])
+  @@index([publishAt])
+}
+
+// 章节（content 为结构化富内容 JSON，与前端 ContentBlock 联合类型对应）
+model Chapter {
+  id        String   @id @default(cuid())
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  order     Int
+  title     String
+  content   String // ContentBlock[]（JSON 字符串）
+  wordCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  comments  Comment[]
+
+  @@unique([workId, order])
+}
+
+// ---------- 标签 ----------
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  works Work[]
+
+  @@index([name])
+}
+
+// ---------- 互动（赞 / 收藏 / 共鸣） ----------
+
+model Like {
+  userId String
+  workId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, workId])
+}
+
+model Collection {
+  userId String
+  workId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, workId])
+}
+
+// 共鸣 —— 「我也有过相似经历」
+model Resonate {
+  userId String
+  workId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, workId])
+}
+
+// ---------- 评论 ----------
+
+model Comment {
+  id        String   @id @default(cuid())
+  workId    String
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  parentId  String?
+  parent    Comment? @relation("replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("replies")
+  likes     Int      @default(0)
+  likedBy   CommentLike[]
+  createdAt DateTime @default(now())
+
+  @@index([workId])
+  @@index([authorId])
+}
+
+// 评论点赞（用户维度去重）
+model CommentLike {
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([commentId, userId])
+  @@index([userId])
+}
+
+// 书签（阅读状态：用户在某部作品中收藏的具体章节）
+model Bookmark {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workId       String
+  work         Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  chapterOrder Int
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, workId, chapterOrder])
+  @@index([userId])
+}
+
+// 划线（阅读状态：用户对章节内具体文字的选择标记，持久化到数据库）
+model Highlight {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workId       String
+  work         Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  chapterOrder Int
+  text         String
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, workId, chapterOrder, text])
+  @@index([userId])
+}
+
+// ---------- 通知 ----------
+
+model Notification {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation("notify_to", fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  actorId   String?
+  actor     User?      @relation("notify_actor", fields: [actorId], references: [id], onDelete: SetNull)
+  content   String?
+  workId    String?
+  work      Work?      @relation(fields: [workId], references: [id], onDelete: SetNull)
+  read      Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  @@index([userId, read])
+}
+
+// ---------- 私信 ----------
+
+model Conversation {
+  id          String   @id @default(cuid())
+  userAId     String
+  userBId     String
+  userA       User     @relation("conv_user_a", fields: [userAId], references: [id], onDelete: Cascade)
+  userB       User     @relation("conv_user_b", fields: [userBId], references: [id], onDelete: Cascade)
+  lastMessage String?
+  lastAt      DateTime @default(now())
+  messages    Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  fromId         String
+  from           User        @relation(fields: [fromId], references: [id], onDelete: Cascade)
+  type           String    @default("TEXT")
+  content        String
+  read           Boolean     @default(false)
+  workId         String?
+  work           Work?       @relation(fields: [workId], references: [id], onDelete: SetNull)
+  createdAt      DateTime    @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------- 书架 / 阅读进度 ----------
+
+model ShelfItem {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workId           String
+  work             Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  progress         Float    @default(0) // 0-1
+  lastChapterOrder Int      @default(0)
+  lastReadAt       DateTime @default(now())
+
+  @@unique([userId, workId])
+}
+
+// ---------- 草稿 ----------
+
+model Draft {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String?
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---------- AI 采访对话（记忆） ----------
+
+model AiConversation {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic        String?
+  currentStep  Int         @default(0)
+  storyContext String      @default("{}") // Life Context JSON：人物/地点/时间/事件/关系/情绪/物件
+  status       String      @default("ACTIVE") // ACTIVE / COMPLETED
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  messages     AiMessage[]
+
+  @@index([userId])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "ai" | "user"
+  content        String
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------- AI 特色（时间轴 / 情绪曲线 / 人物关系图） ----------
+
+model WorkAi {
+  id        String  @id @default(cuid())
+  workId    String  @unique
+  work      Work    @relation(fields: [workId], references: [id], onDelete: Cascade)
+  timeline  String // TimelineNode[]（JSON 字符串）
+  emotionCurve String // EmotionPoint[]（JSON 字符串）
+  characterGraph String // { nodes, edges }（JSON 字符串）
+  updatedAt DateTime @updatedAt
+}

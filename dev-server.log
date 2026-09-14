@@ -1,0 +1,22 @@
+
+> lifeink-tmp@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 5.1s
+ ○ Compiling / ...
+ ✓ Compiled / in 5.7s (1635 modules)
+ GET / 200 in 6019ms
+ ✓ Compiled in 491ms (795 modules)
+ GET / 200 in 130ms
+ ○ Compiling /user ...
+ ✓ Compiled /user in 832ms (1628 modules)
+ ✓ Compiled /create in 392ms (1630 modules)
+ ✓ Compiled /search in 364ms (1632 modules)
+ ✓ Compiled /work/[workId] in 437ms (1634 modules)
+ ✓ Compiled /messages in 429ms (1636 modules)
+ ○ Compiling /category ...
+ ✓ Compiled /category in 566ms (1638 modules)

@@ -1,0 +1,46 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files（含密钥，绝不提交）
+.env
+.env*.local
+server/.env
+
+# 后端：本地 SQLite 数据库 / 用户上传内容 / 构建产物
+server/*.db
+server/*.db-journal
+server/dev.db
+server/uploads/
+server/dist/
+server/node_modules/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
