@@ -9,6 +9,7 @@ import { categories, discoverTags } from "@/lib/constants/categories";
 import { photoFor } from "@/lib/photos";
 import { WorkMasonry } from "@/components/work/WorkMasonry";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** 发现页 ——「人生探索地图」：热门标签 + 人生主题（照片/气质文案/故事数）+ 瀑布流。 */
@@ -35,7 +36,7 @@ const CATEGORY_MOODS: Record<string, string> = {
 export default function DiscoverPage() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
 
-  const { data: works, isLoading } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
+  const { data: works, isLoading, isError, refetch } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -53,6 +54,9 @@ export default function DiscoverPage() {
       list.sort((a, b) => (b.publishAt ?? "").localeCompare(a.publishAt ?? ""));
     } else if (activeTag === "编辑推荐") {
       list.sort((a, b) => b.resonateCount - a.resonateCount);
+    } else if (activeTag === "真人故事") {
+      // 真人故事 = 非 AI 辅助生成的真实人生（按真实来源过滤）
+      list = list.filter((w) => w.storySource !== "AI_ASSISTED");
     }
     return list;
   }, [works, activeTag]);
@@ -76,37 +80,46 @@ export default function DiscoverPage() {
         })}
       </div>
 
+      {/* 错误态 */}
+      {isError && (
+        <ErrorState title="加载失败" description="发现内容暂时无法加载，请稍后重试" onRetry={() => refetch()} />
+      )}
+
       {/* 人生主题 */}
-      {!activeTag && (
+      {!isError && !activeTag && (
         <section>
           <h2 className="mb-3 text-sm font-semibold text-foreground">人生主题</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {categories.map((cat) => {
-              const Icon = cat.icon;
-              const photo = photoFor({ id: cat.id, categoryL1: cat.id, emotion: null, tags: [] });
-              return (
-                <Link key={cat.id} href={`/category/${cat.id}`} className="group relative overflow-hidden rounded-2xl">
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo} alt={cat.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-                    <div className="absolute inset-x-3 bottom-3">
-                      <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
-                        <Icon className="h-4 w-4" style={{ color: cat.color }} /> {cat.name}
-                      </p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-white/80">{CATEGORY_MOODS[cat.id] ?? ""}</p>
-                      <p className="mt-0.5 text-[11px] text-white/60">{counts.get(cat.id) ?? 0} 个故事</p>
+          {isLoading ? (
+            <SkeletonGrid />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {categories.map((cat) => {
+                const Icon = cat.icon;
+                const photo = photoFor({ id: cat.id, categoryL1: cat.id, emotion: null, tags: [] });
+                return (
+                  <Link key={cat.id} href={`/category/${cat.id}`} className="group relative overflow-hidden rounded-2xl">
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo} alt={cat.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+                      <div className="absolute inset-x-3 bottom-3">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                          <Icon className="h-4 w-4" style={{ color: cat.color }} /> {cat.name}
+                        </p>
+                        <p className="mt-0.5 line-clamp-1 text-xs text-white/80">{CATEGORY_MOODS[cat.id] ?? ""}</p>
+                        <p className="mt-0.5 text-[11px] text-white/60">{counts.get(cat.id) ?? 0} 个故事</p>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
       {/* 筛选结果 */}
-      {activeTag && (
+      {!isError && activeTag && (
         <section>
           <h2 className="mb-3 text-sm font-semibold text-foreground">
             {activeTag} <span className="ml-2 text-xs font-normal text-subtle">{filtered.length} 个故事</span>

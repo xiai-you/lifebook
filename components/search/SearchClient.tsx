@@ -10,6 +10,8 @@ import { searchWorks, getHotTopics } from "@/lib/api";
 import { Avatar } from "@/components/ui/avatar";
 import { WorkMasonry } from "@/components/work/WorkMasonry";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FollowButton } from "@/components/shared/StoryActions";
 import type { Author } from "@/types";
 
@@ -39,10 +41,10 @@ export function SearchClient() {
   const [query, setQuery] = useState(params.get("q") ?? "");
   const debounced = useDebouncedValue(query, 300);
   const [tab, setTab] = useState<TabKey>("all");
-  const [history, setHistory] = useState<string[]>(["北漂", "抑郁症", "异地恋"]);
+  const [history, setHistory] = useState<string[]>([]);
 
-  const { data: hotTopics } = useQuery({ queryKey: ["hot-topics"], queryFn: getHotTopics });
-  const { data: result, isFetching } = useQuery({
+  const { data: hotTopics, isLoading: hotLoading } = useQuery({ queryKey: ["hot-topics"], queryFn: getHotTopics });
+  const { data: result, isFetching, isError, refetch } = useQuery({
     queryKey: ["search", debounced],
     queryFn: () => searchWorks(debounced),
     enabled: debounced.trim().length > 0,
@@ -102,7 +104,13 @@ export function SearchClient() {
           <section>
             <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground"><TrendingUp className="h-4 w-4 text-accent" />热搜榜</h2>
             <ol className="flex flex-col gap-1">
-              {(hotTopics ?? []).slice(0, 10).map((t, i) => (
+              {hotLoading && Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="flex items-center gap-3 rounded-xl px-2 py-2">
+                  <Skeleton className="h-3 w-4" />
+                  <Skeleton className="h-3 flex-1" />
+                </li>
+              ))}
+              {!hotLoading && (hotTopics ?? []).slice(0, 10).map((t, i) => (
                 <li key={t.id}>
                   <button onClick={() => setQuery(t.title)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-hover">
                     <span className={cn("w-4 text-center text-sm font-bold", i < 3 ? "text-accent" : "text-subtle")}>{i + 1}</span>
@@ -127,7 +135,9 @@ export function SearchClient() {
             ))}
           </div>
 
-          {isFetching ? (
+          {isError ? (
+            <ErrorState title="搜索失败" description="搜索服务暂时不可用，请稍后重试" onRetry={() => refetch()} />
+          ) : isFetching ? (
             <p className="py-10 text-center text-sm text-subtle">搜索中…</p>
           ) : !result ? (
             <EmptyState title="输入关键词开始搜索" />

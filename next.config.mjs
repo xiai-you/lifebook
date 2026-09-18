@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+const isProd = process.env.NODE_ENV === "production";
+// 生产环境必须显式配置后端代理目标，禁止静默回退 localhost；开发环境可回退本机后端。
+if (isProd && !process.env.API_PROXY_TARGET) {
+  throw new Error(
+    "生产环境必须设置 API_PROXY_TARGET（例如 https://<后端域名>），禁止回退到 localhost:3001。"
+  );
+}
 const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "http://localhost:3001";
 
 const nextConfig = {

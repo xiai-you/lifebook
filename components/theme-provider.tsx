@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getSettings } from "@/lib/api";
+import { useAuthStore, selectAuthStatus } from "@/lib/store/useAuthStore";
 
 /**
  * 主题上下文 —— 支持 浅色 / 深色 / 跟随系统（需求文档第二节）
@@ -26,6 +28,10 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "lifebook-theme";
 
+function isTheme(v: unknown): v is Theme {
+  return v === "light" || v === "dark" || v === "system";
+}
+
 function getSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -36,13 +42,14 @@ function getSystemTheme(): "light" | "dark" {
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "system";
   const saved = window.localStorage.getItem(STORAGE_KEY);
-  if (saved === "light" || saved === "dark" || saved === "system") return saved;
+  if (isTheme(saved)) return saved;
   return "system";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("system");
   const [resolved, setResolved] = useState<"light" | "dark">("light");
+  const status = useAuthStore(selectAuthStatus);
 
   // 应用主题到 <html>
   useEffect(() => {
@@ -60,6 +67,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setThemeState(getInitialTheme());
   }, []);
+
+  // 登录后从后端设置恢复主题（仅当本地无显式偏好时），实现跨设备一致。
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const local = window.localStorage.getItem(STORAGE_KEY);
+    if (isTheme(local)) return;
+    getSettings()
+      .then((s) => {
+        if (!s) return;
+        const t = s.theme;
+        if (isTheme(t)) {
+          setThemeState(t);
+          window.localStorage.setItem(STORAGE_KEY, t);
+        }
+      })
+      .catch((e) => console.error("[theme] 恢复主题失败", e));
+  }, [status]);
 
   // 跟随系统变化
   useEffect(() => {

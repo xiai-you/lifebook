@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, MessageCircle, Apple, Mail, Check } from "lucide-react";
+import { Eye, EyeOff, MessageCircle, Apple, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { Logo } from "@/components/shared/Logo";
@@ -23,7 +23,6 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
   const [oauthHint, setOauthHint] = useState<string | null>(null);
 
   async function submit() {
@@ -35,7 +34,7 @@ export default function LoginPage() {
     if (mode === "login" && password.length < 6) return setError("密码至少 6 位");
 
     if (mode === "reset") {
-      setResetSent(true);
+      setError("密码重置功能即将开放，暂不支持线上重置。");
       return;
     }
 
@@ -79,7 +78,7 @@ export default function LoginPage() {
           {(["login", "register"] as Mode[]).map((m) => (
             <button
               key={m}
-              onClick={() => { setMode(m); setError(null); setResetSent(false); }}
+              onClick={() => { setMode(m); setError(null); }}
               className={cn(
                 "rounded-full py-2 text-sm font-medium transition-all",
                 mode === m ? "bg-card text-foreground shadow-sm" : "text-muted"
@@ -142,15 +141,10 @@ export default function LoginPage() {
           )}
 
           {error && <p className="text-xs text-danger">{error}</p>}
-          {resetSent && (
-            <p className="flex items-center gap-1 text-xs text-success">
-              <Check className="h-3.5 w-3.5" /> 重置链接已发送（演示环境，不会真的发送邮件）
-            </p>
-          )}
 
           {mode === "login" && (
             <div className="flex justify-end">
-              <button type="button" onClick={() => { setMode("reset"); setResetSent(false); setError(null); }} className="text-xs text-primary hover:underline">
+              <button type="button" onClick={() => { setMode("reset"); setError(null); }} className="text-xs text-primary hover:underline">
                 忘记密码？
               </button>
             </div>

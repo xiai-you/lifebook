@@ -22,4 +22,5 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start:prod"]
+# 启动前应用数据库结构（无 migrations，用 db push 幂等同步），避免首次部署空库报 "relation does not exist"。
+CMD ["sh", "-c", "npx prisma db push && node dist/main.js"]

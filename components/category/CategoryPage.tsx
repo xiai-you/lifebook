@@ -7,6 +7,7 @@ import { getAllWorks } from "@/lib/api";
 import { getCategoryById } from "@/lib/constants/categories";
 import { WorkMasonry } from "@/components/work/WorkMasonry";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** 分类页 —— 分类主题图 / 一句话气质描述 / 故事数量 / 二级筛选 / 瀑布流。 */
@@ -14,7 +15,7 @@ export function CategoryPage({ categoryId }: { categoryId: string }) {
   const category = getCategoryById(categoryId);
   const [sub, setSub] = useState<string | null>(null);
 
-  const { data: works, isLoading } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
+  const { data: works, isLoading, isError, refetch } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
 
   const list = useMemo(() => {
     let l = (works ?? []).filter((w) => w.categoryL1 === categoryId);
@@ -69,7 +70,9 @@ export function CategoryPage({ categoryId }: { categoryId: string }) {
         ))}
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState title="加载失败" description="分类内容暂时无法加载，请稍后重试" onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="columns-2 gap-4 md:columns-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="mb-4 aspect-[3/4] w-full rounded-2xl" />

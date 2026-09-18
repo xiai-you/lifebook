@@ -11,6 +11,12 @@ import { AppModule } from "./app.module";
  * 生产级配置：全局校验管道、API 版本前缀、OpenAPI 文档、安全头、CORS。
  */
 async function bootstrap() {
+  // 生产环境缺失 JWT_SECRET 时立即失败：否则会静默回退到公开的 "dev-secret"，
+  // 任何人可据此伪造任意用户的 token（账号冒用风险）。
+  if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+    throw new Error("生产环境必须设置 JWT_SECRET 环境变量，禁止使用 dev-secret 兜底。");
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // 安全头

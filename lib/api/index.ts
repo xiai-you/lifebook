@@ -528,17 +528,21 @@ export async function likeComment(workId: string, commentId: string): Promise<vo
 /** 发送私信（toId 为收信人用户 id） */
 export async function sendChatMessage(
   toId: string,
-  content: string
+  content: string,
+  type: ChatMessage["type"] = "text"
 ): Promise<ChatMessage> {
   if (isHttpMode()) {
     const me = await getCurrentUser();
-    const m = await http.post<unknown>(`/messages/conversations/${toId}`, { content });
+    const m = await http.post<unknown>(`/messages/conversations/${toId}`, {
+      content,
+      type: type.toUpperCase(),
+    });
     return toChatMessage(m, me.id);
   }
   const message: ChatMessage = {
     id: `local-msg-${Date.now()}`,
     from: "me",
-    type: "text",
+    type,
     content,
     createdAt: "刚刚",
   };
@@ -721,6 +725,7 @@ export interface UpdateProfilePayload {
   coverImage?: string;
   region?: string;
   country?: string;
+  gender?: "male" | "female" | "other" | "secret";
   interests?: string[];
   tags?: string[];
 }
@@ -831,9 +836,12 @@ export async function createHighlight(
 
 /** 删除划线（仅本人）。 */
 export async function deleteHighlight(id: string): Promise<void> {
-  if (isHttpMode()) await http.delete(`/me/highlights/${id}`);
-  const i = mockHighlights.findIndex((h) => h.id === id);
-  if (i >= 0) mockHighlights.splice(i, 1);
+  if (isHttpMode()) {
+    await http.delete(`/me/highlights/${id}`);
+  } else {
+    const i = mockHighlights.findIndex((h) => h.id === id);
+    if (i >= 0) mockHighlights.splice(i, 1);
+  }
 }
 
 export interface DraftDto {

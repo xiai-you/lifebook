@@ -1,33 +1,35 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Send, Image as ImageIcon, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getConversations, getChatMessages, sendChatMessage } from "@/lib/api";
+import { getConversations, getChatMessages, sendChatMessage, uploadImage } from "@/lib/api";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/shared/ErrorState";
 import type { ChatMessage } from "@/types";
 
-/** 聊天视图 —— 真实发送（文字 / 图片）、在线状态、作品卡片气泡。 */
+/** 聊天视图 —— 真实发送（文字 / 图片）、作品卡片气泡。 */
 
 export default function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { data: conversations } = useQuery({ queryKey: ["conversations"], queryFn: getConversations });
-  const { data: messages, isLoading } = useQuery({
+  const { data: messages, isLoading, isError, refetch } = useQuery({
     queryKey: ["chat", conversationId],
     queryFn: () => getChatMessages(conversationId),
   });
 
   const [input, setInput] = useState("");
   const [sent, setSent] = useState<ChatMessage[]>([]);
+  const [sendingImage, setSendingImage] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const other = (conversations ?? []).find((c) => c.id === conversationId)?.user;
   const all = [...(messages ?? []), ...sent];
-  const online = conversationId.split("").reduce((s, c) => s + c.charCodeAt(0), 0) % 2 === 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,18 +41,28 @@ export default function ChatPage() {
     const msg: ChatMessage = { id: `local-${Date.now()}`, from: "me", type: "text", content: v, createdAt: "刚刚" };
     setSent((s) => [...s, msg]);
     setInput("");
-    sendChatMessage(other?.id ?? conversationId, v).catch(() => {});
+    sendChatMessage(other?.id ?? conversationId, v).catch((e) => console.error("[chat] 发送失败", e));
   }
 
-  function sendImage() {
-    const msg: ChatMessage = {
-      id: `local-img-${Date.now()}`,
-      from: "me",
-      type: "image",
-      content: `https://picsum.photos/seed/chat-${Date.now()}/400/300`,
-      createdAt: "刚刚",
-    };
-    setSent((s) => [...s, msg]);
+  function pickImage() {
+    fileRef.current?.click();
+  }
+
+  async function onImageSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setSendingImage(true);
+    try {
+      // 真实上传到后端存储，再作为图片消息发出（不再使用随机占位图）。
+      const { url } = await uploadImage(file);
+      await sendChatMessage(other?.id ?? conversationId, url, "image");
+      setSent((s) => [...s, { id: `local-img-${Date.now()}`, from: "me", type: "image", content: url, createdAt: "刚刚" }]);
+    } catch (err) {
+      console.error("[chat] 图片发送失败", err);
+    } finally {
+      setSendingImage(false);
+    }
   }
 
   return (
@@ -60,13 +72,9 @@ export default function ChatPage() {
         <Link href="/messages" className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover" aria-label="返回">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="relative">
-          <Avatar name={other?.nickname ?? "对方"} src={other?.avatar} size="md" />
-          <span className={cn("absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-background", online ? "bg-success" : "bg-subtle")} />
-        </div>
+        <Avatar name={other?.nickname ?? "对方"} src={other?.avatar} size="md" />
         <div className="min-w-0">
           <p className="font-medium text-foreground">{other?.nickname ?? "聊天"}</p>
-          <p className="text-xs text-subtle">{online ? "在线" : "离线"}</p>
         </div>
       </div>
 
@@ -80,6 +88,8 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
+        ) : isError ? (
+          <ErrorState title="加载失败" description="消息暂时无法加载，请稍后重试" onRetry={() => refetch()} />
         ) : (
           all.map((m) => <Bubble key={m.id} message={m} />)
         )}
@@ -88,9 +98,10 @@ export default function ChatPage() {
 
       {/* 输入框 */}
       <div className="flex items-center gap-2 border-t border-divider pt-3">
-        <button type="button" onClick={sendImage} aria-label="发送图片" className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-primary">
+        <button type="button" onClick={pickImage} disabled={sendingImage} aria-label="发送图片" className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-primary disabled:opacity-40">
           <ImageIcon className="h-5 w-5" />
         </button>
+        <input ref={fileRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

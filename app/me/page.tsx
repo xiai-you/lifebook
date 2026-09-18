@@ -10,6 +10,7 @@ import { useAppStore } from "@/lib/store/useAppStore";
 import { Avatar } from "@/components/ui/avatar";
 import { WorkMasonry } from "@/components/work/WorkMasonry";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** 个人主页（我的）—— 真实用户主页：头像 / 签名 / 数据 / 作品·草稿·收藏·人生时间轴。 */
@@ -27,7 +28,7 @@ export default function MePage() {
   const [tab, setTab] = useState<TabKey>("works");
   const storeDrafts = useAppStore((s) => s.drafts);
   const removeDraft = useAppStore((s) => s.removeDraft);
-  const { data: backendDrafts } = useQuery({ queryKey: ["drafts"], queryFn: getDrafts });
+  const { data: backendDrafts, isLoading: draftsLoading, isError: draftsError, refetch: refetchDrafts } = useQuery({ queryKey: ["drafts"], queryFn: getDrafts });
 
   // 合并：当前会话草稿 + 后端持久化草稿
   const drafts = [
@@ -35,9 +36,12 @@ export default function MePage() {
     ...(backendDrafts ?? []).map((d) => ({ id: d.id, title: d.title, summary: undefined, content: d.content ?? undefined, updatedAt: d.updatedAt })),
   ].filter((d, i, arr) => arr.findIndex((x) => x.id === d.id) === i);
 
-  const { data: user } = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
-  const { data: works, isLoading } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
-  const { data: collections } = useQuery({ queryKey: ["collections"], queryFn: getCollections });
+  const { data: user, isLoading: userLoading, isError: userError, refetch: refetchUser } = useQuery({ queryKey: ["me"], queryFn: getCurrentUser });
+  const { data: works, isLoading: worksLoading, isError: worksError, refetch: refetchWorks } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
+  const { data: collections, isLoading: collectionsLoading, isError: collectionsError, refetch: refetchCollections } = useQuery({ queryKey: ["collections"], queryFn: getCollections });
+
+  const isError = userError || worksError || draftsError || collectionsError;
+  const refetchAll = () => { refetchUser(); refetchWorks(); refetchDrafts(); refetchCollections(); };
 
   const myWorks = (works ?? []).filter((w) => w.authorId === user?.id);
   // 人生时间轴：以真实作品按「故事发生年份」升序排列（无年份的靠后）
@@ -84,7 +88,7 @@ export default function MePage() {
           </div>
         </div>
 
-        <h1 className="mt-3 font-serif text-2xl font-bold text-foreground">{user?.nickname ?? "林小满"}</h1>
+        <h1 className="mt-3 font-serif text-2xl font-bold text-foreground">{user?.nickname ?? "我"}</h1>
         <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted">{user?.bio}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
@@ -101,12 +105,19 @@ export default function MePage() {
 
         {/* 数据条 */}
         <div className="mt-4 grid grid-cols-4 border-y border-divider py-3 text-center">
-          {statItems.map((s) => (
-            <div key={s.label}>
-              <p className="text-base font-semibold tabular-nums text-foreground">{formatCount(s.value)}</p>
-              <p className="mt-0.5 text-xs text-subtle">{s.label}</p>
-            </div>
-          ))}
+          {userLoading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <Skeleton className="h-4 w-10" />
+                  <Skeleton className="h-3 w-6" />
+                </div>
+              ))
+            : statItems.map((s) => (
+                <div key={s.label}>
+                  <p className="text-base font-semibold tabular-nums text-foreground">{formatCount(s.value)}</p>
+                  <p className="mt-0.5 text-xs text-subtle">{s.label}</p>
+                </div>
+              ))}
         </div>
 
         {/* Tab */}
@@ -123,51 +134,57 @@ export default function MePage() {
         </div>
 
         <div className="py-4">
-          {tab === "works" && (isLoading ? <SkeletonGrid /> : myWorks.length === 0 ? <EmptyState title="还没有作品" description="点击「开始写人生」，写下你的第一个故事" /> : <WorkMasonry works={myWorks} />)}
-
-          {tab === "drafts" && (drafts.length === 0 ? (
-            <EmptyState title="草稿箱是空的" description="去「人生故事工作室」开始你的第一篇" />
+          {isError ? (
+            <ErrorState title="加载失败" description="个人主页数据暂时无法加载，请稍后重试" onRetry={refetchAll} />
           ) : (
-            <div className="space-y-2">
-              {drafts.map((d) => (
-                <div key={d.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-divider transition-colors hover:bg-hover">
-                  <FileText className="h-5 w-5 shrink-0 text-subtle" />
-                  <Link href="/write" className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{d.title}</p>
-                    <p className="truncate text-xs text-subtle">{d.summary ?? "最后编辑于 " + d.updatedAt}</p>
-                  </Link>
-                  <button onClick={() => { removeDraft(d.id); deleteDraft(d.id).catch(() => {}); }} aria-label="删除草稿" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-subtle transition-colors hover:bg-danger/10 hover:text-danger">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+            <>
+              {tab === "works" && (worksLoading ? <SkeletonGrid /> : myWorks.length === 0 ? <EmptyState title="还没有作品" description="点击「开始写人生」，写下你的第一个故事" /> : <WorkMasonry works={myWorks} />)}
+
+              {tab === "drafts" && (draftsLoading ? <SkeletonGrid /> : drafts.length === 0 ? (
+                <EmptyState title="草稿箱是空的" description="去「人生故事工作室」开始你的第一篇" />
+              ) : (
+                <div className="space-y-2">
+                  {drafts.map((d) => (
+                    <div key={d.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-divider transition-colors hover:bg-hover">
+                      <FileText className="h-5 w-5 shrink-0 text-subtle" />
+                      <Link href="/write" className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{d.title}</p>
+                        <p className="truncate text-xs text-subtle">{d.summary ?? "最后编辑于 " + d.updatedAt}</p>
+                      </Link>
+                      <button onClick={() => { removeDraft(d.id); deleteDraft(d.id).catch(() => {}); }} aria-label="删除草稿" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-subtle transition-colors hover:bg-danger/10 hover:text-danger">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ))}
-            </div>
-          ))}
 
-          {tab === "collections" && ((collections ?? []).length === 0 ? <EmptyState title="还没有收藏" description="读到自己喜欢的作品就收藏起来吧" /> : <WorkMasonry works={(collections ?? []).map((c) => c.work)} />)}
+              {tab === "collections" && (collectionsLoading ? <SkeletonGrid /> : (collections ?? []).length === 0 ? <EmptyState title="还没有收藏" description="读到自己喜欢的作品就收藏起来吧" /> : <WorkMasonry works={(collections ?? []).map((c) => c.work)} />)}
 
-          {tab === "timeline" && (
-            lifeTimeline.length === 0 ? (
-              <EmptyState title="暂无人生事件" description="写下你的故事，它们会按时间排列在这里" />
-            ) : (
-              <div>
-                {lifeTimeline.map((w, i) => (
-                  <div key={w.id} className="relative flex gap-4 pb-6">
-                    <div className="flex flex-col items-center">
-                      <span className="z-10 h-3 w-3 shrink-0 rounded-full bg-primary ring-4 ring-background" />
-                      {i < lifeTimeline.length - 1 && <span className="w-px flex-1 bg-divider" />}
-                    </div>
-                    <Link href={`/story/${w.id}`} className="group min-w-0 flex-1 pb-1">
-                      <p className="text-xs font-medium tabular-nums text-primary">
-                        {w.momentLabel ?? w.year ?? w.publishAt?.slice(0, 4) ?? "—"}
-                      </p>
-                      <p className="mt-0.5 font-serif text-base font-semibold text-foreground transition-colors group-hover:text-primary">{w.title}</p>
-                      <p className="mt-0.5 line-clamp-2 text-sm text-muted">{w.summary}</p>
-                    </Link>
+              {tab === "timeline" && (
+                lifeTimeline.length === 0 ? (
+                  <EmptyState title="暂无人生事件" description="写下你的故事，它们会按时间排列在这里" />
+                ) : (
+                  <div>
+                    {lifeTimeline.map((w, i) => (
+                      <div key={w.id} className="relative flex gap-4 pb-6">
+                        <div className="flex flex-col items-center">
+                          <span className="z-10 h-3 w-3 shrink-0 rounded-full bg-primary ring-4 ring-background" />
+                          {i < lifeTimeline.length - 1 && <span className="w-px flex-1 bg-divider" />}
+                        </div>
+                        <Link href={`/story/${w.id}`} className="group min-w-0 flex-1 pb-1">
+                          <p className="text-xs font-medium tabular-nums text-primary">
+                            {w.momentLabel ?? w.year ?? w.publishAt?.slice(0, 4) ?? "—"}
+                          </p>
+                          <p className="mt-0.5 font-serif text-base font-semibold text-foreground transition-colors group-hover:text-primary">{w.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-sm text-muted">{w.summary}</p>
+                        </Link>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )
+                )
+              )}
+            </>
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@ import { getNotifications, markAllNotificationsRead, markNotificationRead } from
 import { useAppStore } from "@/lib/store/useAppStore";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NotificationItem, NotificationType } from "@/types";
 
@@ -44,7 +45,7 @@ function targetOf(item: NotificationItem): string | null {
 }
 
 export default function NotificationsPage() {
-  const { data, isLoading } = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
   const [tab, setTab] = useState<NotificationType | "all">("all");
   const queryClient = useQueryClient();
   const readIds = useAppStore((s) => s.readNotificationIds);
@@ -99,6 +100,8 @@ export default function NotificationsPage() {
             </div>
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState title="加载失败" description="通知暂时无法加载，请稍后重试" onRetry={() => refetch()} />
       ) : items.length === 0 ? (
         <EmptyState title="暂无此类通知" description="互动发生时会第一时间提醒你" />
       ) : (

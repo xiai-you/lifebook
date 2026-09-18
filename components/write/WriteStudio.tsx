@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
   Sparkles,
-  Mic,
   Image as ImageIcon,
   Square,
   RefreshCw,
@@ -100,6 +99,8 @@ export function WriteStudio() {
   const [visibility, setVisibility] = useState<WorkVisibility>("public");
   const [publishing, setPublishing] = useState(false);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [publishError, setPublishError] = useState(false);
 
   const topicLabel = customTopic.trim() || TOPICS.find((t) => t.id === topic)?.label || topic;
 
@@ -290,6 +291,7 @@ export function WriteStudio() {
     const content = chapters
       .map((c) => `${c.title}\n${c.blocks.map(blockToText).join("\n")}`)
       .join("\n\n");
+    setSaveStatus("saving");
     // 已有草稿则走 PATCH 更新，否则首次创建；复用同一个 id 避免重复草稿。
     let draftId = draftIdRef.current;
     try {
@@ -301,23 +303,28 @@ export function WriteStudio() {
         draftId = created.id;
       }
       draftIdRef.current = draftId;
-    } catch {
-      // 后端不可用时仍本地保存，保证 UI 不报错。
+      // 服务端保存成功后才更新本地缓存并提示「已保存」
+      upsertDraft({
+        id: draftId,
+        title: draftTitle,
+        summary,
+        content,
+        updatedAt: new Date().toISOString().slice(0, 10),
+      });
+      setSaveStatus("saved");
+      setStep("done");
+      setPublishedId(null);
+    } catch (e) {
+      // 保存失败：明确提示，不冒充「已保存」
+      console.error("[draft] 保存草稿失败", e);
+      setSaveStatus("error");
     }
-    upsertDraft({
-      id: draftId ?? `draft-${Date.now()}`,
-      title: draftTitle,
-      summary,
-      content,
-      updatedAt: new Date().toISOString().slice(0, 10),
-    });
-    setStep("done");
-    setPublishedId(null);
   }
 
   async function publish() {
     if (!title.trim() || publishing) return;
     setPublishing(true);
+    setPublishError(false);
     try {
       const w = await publishStory({
         title: title.trim(),
@@ -325,13 +332,15 @@ export function WriteStudio() {
         categoryL1: category,
         categoryL2: topicLabel,
         tags: tags.split(/[，,、\s]+/).filter(Boolean).slice(0, 6),
-        emotion: "真实",
-        city: "北京",
         chapters: chapters.map((c) => ({ title: c.title, blocks: c.blocks })),
         visibility,
       });
       setPublishedId(w.id);
       setStep("done");
+    } catch (e) {
+      // 发布失败：明确提示，可重试；不误报成功
+      console.error("[publish] 发布失败", e);
+      setPublishError(true);
     } finally {
       setPublishing(false);
     }
@@ -428,7 +437,6 @@ export function WriteStudio() {
           {/* 输入区 */}
           <div className="mt-3 space-y-2 border-t border-divider pt-3">
             <div className="flex items-center gap-2">
-              <button aria-label="语音输入" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover"><Mic className="h-5 w-5" /></button>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -437,7 +445,6 @@ export function WriteStudio() {
                 disabled={busy || ready}
                 className="h-10 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
               />
-              <button aria-label="上传图片" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover"><ImageIcon className="h-5 w-5" /></button>
               <button
                 onClick={sendAnswer}
                 disabled={!input.trim() || busy || typing != null}
@@ -578,13 +585,17 @@ export function WriteStudio() {
             <Button onClick={generate} variant="secondary" className="gap-1.5">
               <RefreshCw className="h-4 w-4" /> 重新生成
             </Button>
-            <Button onClick={saveDraft} variant="secondary" className="gap-1.5">
-              <Check className="h-4 w-4" /> 保存草稿
+            <Button onClick={saveDraft} variant="secondary" disabled={saveStatus === "saving"} className="gap-1.5">
+              {saveStatus === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {saveStatus === "saving" ? "保存中…" : saveStatus === "saved" ? "已保存" : saveStatus === "error" ? "保存失败，重试" : "保存草稿"}
             </Button>
             <Button onClick={() => setStep("publish")} className="gap-1.5">
               下一步：发布 <ArrowLeft className="h-4 w-4 rotate-180" />
             </Button>
           </div>
+          {saveStatus === "error" && (
+            <p className="mt-2 text-xs text-danger">草稿保存失败，请检查网络后重试</p>
+          )}
         </div>
       )}
 
@@ -632,6 +643,9 @@ export function WriteStudio() {
               {publishing ? "发布中…" : "发布故事"}
             </Button>
           </div>
+          {publishError && (
+            <p className="mt-2 text-xs text-danger">发布失败，请检查网络后重试</p>
+          )}
         </div>
       )}
 

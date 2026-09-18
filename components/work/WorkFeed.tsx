@@ -8,7 +8,10 @@ import { PhotoCard, EssayCard } from "@/components/home/StoryCards";
 import { WorkCardSkeleton } from "./WorkCardSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api/http";
+import { useAuthStore } from "@/lib/store/useAuthStore";
 import {
   getRecommendWorks,
   getFollowWorks,
@@ -50,7 +53,7 @@ function StoryCard({ work }: { work: Work }) {
 export function WorkFeed() {
   const [activeTab, setActiveTab] = useState<TabKey>("recommend");
   const [works, setWorks] = useState<Work[]>([]);
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "auth">("loading");
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const loadingMoreRef = useRef(false);
@@ -60,13 +63,19 @@ export function WorkFeed() {
   const load = useCallback(async (tab: TabKey) => {
     setStatus("loading");
     setPage(1);
+    // 关注流需要登录：未登录直接给登录引导，不打接口
+    if (tab === "follow" && useAuthStore.getState().status === "unauthenticated") {
+      setStatus("auth");
+      return;
+    }
     try {
       const res = await fetcher[tab](1);
       setWorks(res.list);
       setHasMore(res.hasMore);
       setStatus("success");
-    } catch {
-      setStatus("error");
+    } catch (e) {
+      // 401（未登录 / token 过期）→ 登录引导；其余才是网络/服务器错误
+      setStatus(e instanceof ApiError && e.status === 401 ? "auth" : "error");
     }
   }, []);
 
@@ -142,6 +151,15 @@ export function WorkFeed() {
 
       {/* error */}
       {status === "error" && <ErrorState onRetry={() => load(activeTab)} />}
+
+      {/* auth：关注流未登录 */}
+      {status === "auth" && (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+          <p className="text-sm font-medium text-muted">登录后查看关注内容</p>
+          <p className="text-xs text-subtle">关注你喜欢的作者，第一时间看到他们的新故事</p>
+          <Link href="/login" className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-inverse transition-colors hover:bg-primary-dark">去登录</Link>
+        </div>
+      )}
 
       {/* empty */}
       {status === "success" && works.length === 0 && (

@@ -81,13 +81,14 @@ export class WorksService {
   }
 
   async getById(id: string) {
-    const work = await this.prisma.work.update({
+    // 先校验存在，避免 Prisma update 对不存在的 id 抛 P2025（500）而非 404。
+    const exists = await this.prisma.work.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) throw new NotFoundException("作品不存在");
+    return this.prisma.work.update({
       where: { id },
       data: { viewCount: { increment: 1 } },
       include: { ...WORK_INCLUDE, insight: true },
     });
-    if (!work) throw new NotFoundException("作品不存在");
-    return work;
   }
 
   async getChapters(id: string) {

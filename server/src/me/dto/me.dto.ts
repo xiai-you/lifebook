@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ description: "昵称（可重复）" })
@@ -38,6 +38,11 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(60)
   country?: string;
+
+  @ApiPropertyOptional({ description: "性别（male/female/other/secret）" })
+  @IsOptional()
+  @IsIn(["male", "female", "other", "secret"])
+  gender?: string;
 
   @ApiPropertyOptional({ type: [String], description: "兴趣" })
   @IsOptional()

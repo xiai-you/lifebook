@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getConversations } from "@/lib/api";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  */
 
 export default function MessagesPage() {
-  const { data, isLoading } = useQuery({ queryKey: ["conversations"], queryFn: getConversations });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["conversations"], queryFn: getConversations });
 
   const totalUnread = (data ?? []).reduce((s, c) => s + c.unread, 0);
 
@@ -40,6 +41,8 @@ export default function MessagesPage() {
             </div>
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState title="加载失败" description="消息列表暂时无法加载，请稍后重试" onRetry={() => refetch()} />
       ) : (data ?? []).length === 0 ? (
         <EmptyState title="还没有私信" description="当读者联系你时会显示在这里" />
       ) : (

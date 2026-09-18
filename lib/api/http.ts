@@ -7,7 +7,14 @@ const TOKEN_KEY = "lifebook-token";
 
 /** 是否启用真实后端（构建时内联 NEXT_PUBLIC_* 环境变量）。 */
 export function isHttpMode(): boolean {
-  return process.env.NEXT_PUBLIC_API_MODE === "http";
+  const mode = process.env.NEXT_PUBLIC_API_MODE;
+  // 生产环境必须显式启用真实后端：未配置或非 "http" 时立即失败，禁止静默回退 Mock。
+  if (process.env.NODE_ENV === "production" && mode !== "http") {
+    throw new Error(
+      "生产环境必须设置 NEXT_PUBLIC_API_MODE=http（真实后端），禁止静默回退 Mock。"
+    );
+  }
+  return mode === "http";
 }
 
 /** API 基址：默认相对路径 `/api/v1`（由 next.config 代理到后端，避免 CORS）。 */
@@ -17,8 +24,17 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
   }
   // 服务端（generateMetadata / Route Handler / Server Component）：Node fetch 无法解析相对 URL，
-  // 必须使用绝对地址。优先取服务端专用 API_URL，其次复用显式的 NEXT_PUBLIC_API_URL，最后回退本机后端。
-  return process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+  // 必须使用绝对地址。优先取服务端专用 API_URL，其次复用显式的 NEXT_PUBLIC_API_URL。
+  const absolute = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+  if (absolute) return absolute;
+  // 生产环境缺少绝对后端地址时立即失败（部署配置错误早暴露），而不是静默连 localhost。
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SSR 需要绝对后端地址：请设置 API_URL（例如 https://<后端域名>/api/v1），生产环境不能回退 localhost。"
+    );
+  }
+  // 仅开发环境回退本机后端。
+  return "http://localhost:3001/api/v1";
 }
 
 export function getAuthToken(): string | null {

@@ -29,6 +29,10 @@ export function SettingsPage() {
   const [nickname, setNickname] = useState("");
   const [bio, setBio] = useState("");
   const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "secret">("secret");
+  const [interestsText, setInterestsText] = useState("");
+  const [tagsText, setTagsText] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<string | null>(null);
 
@@ -46,6 +50,10 @@ export function SettingsPage() {
       setNickname(user.nickname);
       setBio(user.bio ?? "");
       setRegion(user.region ?? "");
+      setCountry(user.country ?? "");
+      setGender(user.gender ?? "secret");
+      setInterestsText((user.interests ?? []).join("，"));
+      setTagsText((user.tags ?? []).join("，"));
       setAvatar(user.avatar ?? null);
       setCoverImage(user.coverImage ?? null);
     }
@@ -69,8 +77,8 @@ export function SettingsPage() {
   }
 
   const profileMut = useMutation({
-    mutationFn: (p: { nickname: string; bio: string; region: string }) =>
-      updateProfile({ nickname: p.nickname, bio: p.bio, region: p.region }),
+    mutationFn: (p: { nickname: string; bio: string; region: string; country: string; gender: "male" | "female" | "other" | "secret"; interests: string[]; tags: string[] }) =>
+      updateProfile({ nickname: p.nickname, bio: p.bio, region: p.region, country: p.country, gender: p.gender, interests: p.interests, tags: p.tags }),
     onSuccess: async () => {
       await useAuthStore.getState().refresh();
       queryClient.invalidateQueries({ queryKey: ["me"] });
@@ -235,13 +243,48 @@ export function SettingsPage() {
             <Field label="所在地">
               <Input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="如：北京 · 海淀" />
             </Field>
+            <Field label="国家 / 地区">
+              <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="如：中国" />
+            </Field>
+            <Field label="性别">
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value as "male" | "female" | "other" | "secret")}
+                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              >
+                <option value="secret">保密</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+                <option value="other">其他</option>
+              </select>
+            </Field>
+            <Field label="兴趣（逗号分隔）">
+              <Input value={interestsText} onChange={(e) => setInterestsText(e.target.value)} placeholder="如：旅行，摄影，读书" />
+            </Field>
+            <Field label="人生标签（逗号分隔）">
+              <Input value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="如：北漂，成长" />
+            </Field>
             <Field label="一句话介绍">
               <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={2} placeholder="写一句关于你的话" />
             </Field>
           </div>
 
           <div className="mt-4">
-            <Button onClick={() => profileMut.mutate({ nickname, bio, region })} disabled={profileMut.isPending} className="gap-1.5">
+            <Button
+              onClick={() =>
+                profileMut.mutate({
+                  nickname,
+                  bio,
+                  region,
+                  country,
+                  gender,
+                  interests: interestsText.split(/[，,、\s]+/).filter(Boolean),
+                  tags: tagsText.split(/[，,、\s]+/).filter(Boolean),
+                })
+              }
+              disabled={profileMut.isPending}
+              className="gap-1.5"
+            >
               {profileMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               保存资料
             </Button>

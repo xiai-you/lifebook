@@ -73,6 +73,7 @@ export class MeService {
     if (dto.coverImage !== undefined) data.coverImage = dto.coverImage;
     if (dto.region !== undefined) data.region = dto.region;
     if (dto.country !== undefined) data.country = dto.country;
+    if (dto.gender !== undefined) data.gender = dto.gender.toUpperCase();
     if (dto.interests !== undefined) data.interests = JSON.stringify(dto.interests);
     if (dto.tags !== undefined) data.tags = JSON.stringify(dto.tags);
 

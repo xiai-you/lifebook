@@ -9,6 +9,7 @@ import { getAllWorks, getCollections, getShelf } from "@/lib/api";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { CoverImage } from "@/components/shared/CoverImage";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCategoryById } from "@/lib/constants/categories";
 import type { Work } from "@/types";
@@ -28,9 +29,15 @@ export default function ShelfPage() {
   const readingHistory = useAppStore((s) => s.readingHistory);
   const collectedIds = useAppStore((s) => s.collectedWorkIds);
 
-  const { data: shelf, isLoading } = useQuery({ queryKey: ["shelf"], queryFn: getShelf });
-  const { data: works } = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
-  const { data: collections } = useQuery({ queryKey: ["collections"], queryFn: getCollections });
+  const shelfQ = useQuery({ queryKey: ["shelf"], queryFn: getShelf });
+  const worksQ = useQuery({ queryKey: ["all-works"], queryFn: getAllWorks });
+  const collectionsQ = useQuery({ queryKey: ["collections"], queryFn: getCollections });
+  const { data: shelf } = shelfQ;
+  const { data: works } = worksQ;
+  const { data: collections } = collectionsQ;
+  const isLoading = shelfQ.isLoading || worksQ.isLoading || collectionsQ.isLoading;
+  const isError = shelfQ.isError || worksQ.isError || collectionsQ.isError;
+  const refetchAll = () => { shelfQ.refetch(); worksQ.refetch(); collectionsQ.refetch(); };
 
   const workMap = new Map((works ?? []).map((w) => [w.id, w]));
 
@@ -85,6 +92,8 @@ export default function ShelfPage() {
             </div>
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState title="加载失败" description="书架数据暂时无法加载，请稍后重试" onRetry={refetchAll} />
       ) : items.length === 0 ? (
         <EmptyState
           title={tab === "collections" ? "还没有收藏" : "书架空空如也"}

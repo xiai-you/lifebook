@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { CoverImage } from "@/components/shared/CoverImage";
 import { WorkMasonry } from "@/components/work/WorkMasonry";
 import { Reader } from "@/components/reader/Reader";
@@ -77,9 +78,9 @@ export function WorkDetail({ workId, initialChapter }: { workId: string; initial
   const authUser = useAuthStore((s) => s.user);
   const requireLogin = useRequireLogin();
 
-  const { data: work, isLoading } = useQuery({ queryKey: ["work", workId], queryFn: () => getWorkById(workId) });
-  const { data: chapters } = useQuery({ queryKey: ["chapters", workId], queryFn: () => getChapters(workId) });
-  const { data: comments } = useQuery({ queryKey: ["comments", workId], queryFn: () => getComments(workId) });
+  const { data: work, isLoading, isError, refetch } = useQuery({ queryKey: ["work", workId], queryFn: () => getWorkById(workId) });
+  const { data: chapters, isError: chaptersError, refetch: refetchChapters } = useQuery({ queryKey: ["chapters", workId], queryFn: () => getChapters(workId) });
+  const { data: comments, isError: commentsError, refetch: refetchComments } = useQuery({ queryKey: ["comments", workId], queryFn: () => getComments(workId) });
   const { data: timeline } = useQuery({ queryKey: ["timeline", workId], queryFn: () => getWorkTimeline(workId) });
   const { data: emotion } = useQuery({ queryKey: ["emotion", workId], queryFn: () => getWorkEmotionCurve(workId) });
   const { data: graph } = useQuery({ queryKey: ["graph", workId], queryFn: () => getWorkCharacterGraph(workId) });
@@ -91,6 +92,7 @@ export function WorkDetail({ workId, initialChapter }: { workId: string; initial
   }, [initialChapter]);
 
   if (isLoading) return <DetailSkeleton />;
+  if (isError) return <ErrorState title="加载失败" description="故事加载失败，请稍后重试" onRetry={() => refetch()} />;
   if (!work) return <EmptyState title="故事不存在" description="可能已被删除或链接有误" />;
 
   const category = getCategoryById(work.categoryL1);
@@ -348,7 +350,9 @@ export function WorkDetail({ workId, initialChapter }: { workId: string; initial
           目录 <span className="ml-1 text-sm font-normal text-subtle">共 {chapters?.length ?? 0} 章</span>
         </h2>
         <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-divider">
-          {(chapters ?? []).map((ch, i) => (
+          {chaptersError ? (
+            <div className="p-4"><ErrorState title="目录加载失败" description="章节暂时无法加载，请稍后重试" onRetry={() => refetchChapters()} /></div>
+          ) : (chapters ?? []).map((ch, i) => (
             <button
               key={ch.id}
               onClick={() => openReader(i)}
@@ -390,7 +394,9 @@ export function WorkDetail({ workId, initialChapter }: { workId: string; initial
           </button>
         </div>
 
-        {allComments.length === 0 ? (
+        {commentsError ? (
+          <ErrorState title="评论加载失败" description="评论暂时无法加载，请稍后重试" onRetry={() => refetchComments()} />
+        ) : allComments.length === 0 ? (
           <EmptyState title="还没有评论" description="成为第一个留下共鸣的人吧" />
         ) : (
           <div className="space-y-3">
