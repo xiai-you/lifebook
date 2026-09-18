@@ -10,6 +10,10 @@ COPY . .
 # ENV 使其成为构建期环境变量，供 next.config.mjs 的 process.env.API_PROXY_TARGET 使用。
 ARG API_PROXY_TARGET
 ENV API_PROXY_TARGET=$API_PROXY_TARGET
+
+# NEXT_PUBLIC_* 在 next build 时被内联进浏览器 bundle，构建阶段必须可用。
+ARG NEXT_PUBLIC_API_MODE
+ENV NEXT_PUBLIC_API_MODE=$NEXT_PUBLIC_API_MODE
 RUN npm run build
 
 FROM node:20-alpine AS runner
