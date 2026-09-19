@@ -5,14 +5,13 @@
 
 const TOKEN_KEY = "lifebook-token";
 
-/** 是否启用真实后端（构建时内联 NEXT_PUBLIC_* 环境变量）。 */
+/** 是否启用真实后端。
+ * 生产环境强制使用真实 HTTP API（绝不回退 Mock），不依赖 NEXT_PUBLIC_API_MODE 是否被构建链正确内联；
+ * 开发环境由 NEXT_PUBLIC_API_MODE 决定（http 走真实后端，否则走 Mock）。 */
 export function isHttpMode(): boolean {
   const mode = process.env.NEXT_PUBLIC_API_MODE;
-  // 生产环境必须显式启用真实后端：未配置或非 "http" 时立即失败，禁止静默回退 Mock。
-  if (process.env.NODE_ENV === "production" && mode !== "http") {
-    throw new Error(
-      "生产环境必须设置 NEXT_PUBLIC_API_MODE=http（真实后端），禁止静默回退 Mock。"
-    );
+  if (process.env.NODE_ENV === "production") {
+    return true;
   }
   return mode === "http";
 }
