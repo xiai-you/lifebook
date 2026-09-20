@@ -389,3 +389,20 @@ model WorkAi {
   characterGraph String // { nodes, edges }（JSON 字符串）
   updatedAt DateTime @updatedAt
 }
+
+// ---------- AI 用量统计（成本安全 / 每日限制） ----------
+
+model AiUsage {
+  id            String   @id @default(cuid())
+  userId        String?
+  provider      String
+  model         String
+  feature       String   // INTERVIEW / MEMORY_EXTRACTION / CHAPTER_GENERATION / POLISH
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  estimatedCost Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}

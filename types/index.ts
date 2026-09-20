@@ -306,7 +306,7 @@ export interface Draft {
 
 export interface AiMessage {
   id: string;
-  role: "ai" | "user";
+  role: "assistant" | "user";
   content: string;
   createdAt: string;
 }

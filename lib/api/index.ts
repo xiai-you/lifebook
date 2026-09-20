@@ -899,7 +899,7 @@ export async function getAiConversation(id: string): Promise<AiConversationDetai
 
 export async function sendAiMessage(
   conversationId: string,
-  role: "ai" | "user",
+  role: "assistant" | "user",
   content: string
 ): Promise<void> {
   if (isHttpMode()) await http.post(`/me/ai/conversations/${conversationId}/messages`, { role, content });
@@ -910,4 +910,15 @@ export async function updateAiConversation(
   patch: { currentStep?: number; storyContext?: LifeContext; status?: "ACTIVE" | "COMPLETED" }
 ): Promise<void> {
   if (isHttpMode()) await http.patch(`/me/ai/conversations/${id}`, patch);
+}
+
+/** 生成下一个采访问题（真实 AI，基于 conversation 历史）。 */
+export async function generateInterviewQuestion(
+  conversationId: string
+): Promise<{ question: string }> {
+  if (isHttpMode()) {
+    return await http.post<{ question: string }>("/ai/interview/question", { conversationId });
+  }
+  // 非 http 模式（开发 mock）：占位问题，仅用于无后端演示。
+  return mock({ question: "先和我讲讲，关于这段经历，你印象最深的画面是什么？" });
 }

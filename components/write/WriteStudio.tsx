@@ -7,9 +7,7 @@ import {
   Send,
   Sparkles,
   Image as ImageIcon,
-  Square,
   RefreshCw,
-  SkipForward,
   Pencil,
   BookOpen,
   Check,
@@ -29,6 +27,7 @@ import {
   getAiConversation,
   sendAiMessage,
   updateAiConversation,
+  generateInterviewQuestion,
   uploadImage,
 } from "@/lib/api";
 import { extractLifeContext, emptyLifeContext, contextSummary } from "@/lib/ai/lifeContext";
@@ -45,13 +44,6 @@ const TOPICS = [
   { id: "turn", label: "人生转折", hint: "命运的拐点" },
   { id: "special", label: "某段特殊经历", hint: "独一无二" },
   { id: "recent", label: "从最近开始", hint: "此刻的生活" },
-];
-
-const QUESTIONS = [
-  (topic: string) => `先和我讲讲，关于「${topic}」，你印象最深的画面是什么？`,
-  () => "那时候的你，是什么样的人？住在哪里，和谁在一起？",
-  () => "这段经历里，有没有一个瞬间，让你至今想起来都心里一颤？",
-  () => "后来回头看，你最想对那时的自己说一句什么？",
 ];
 
 const GENERATION_STEPS = [
@@ -74,10 +66,9 @@ export function WriteStudio() {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [input, setInput] = useState("");
   const [answers, setAnswers] = useState<string[]>([]);
-  const [typing, setTyping] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [aiThinking, setAiThinking] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const convIdRef = useRef<string | null>(null);
   const draftIdRef = useRef<string | null>(null);
@@ -104,13 +95,9 @@ export function WriteStudio() {
 
   const topicLabel = customTopic.trim() || TOPICS.find((t) => t.id === topic)?.label || topic;
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-  }, []);
-
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, typing]);
+  }, [messages, aiThinking]);
 
   // 恢复最近一次未完成的采访（AI 记忆）
   useEffect(() => {
@@ -127,12 +114,12 @@ export function WriteStudio() {
         setMessages(
           detail.messages.map((m) => ({
             id: m.id,
-            role: m.role as "ai" | "user",
+            role: m.role as "assistant" | "user",
             content: m.content,
             createdAt: "",
           }))
         );
-        setReady(detail.currentStep >= QUESTIONS.length);
+        setReady(false);
         setStep("interview");
       } catch {
         // 无后端 / 未登录：忽略
@@ -143,24 +130,29 @@ export function WriteStudio() {
     };
   }, []);
 
-  function say(text: string): Promise<void> {
-    return new Promise((resolve) => {
-      setBusy(true);
-      setTyping("");
-      let i = 0;
-      timerRef.current = setInterval(() => {
-        i += 1;
-        setTyping(text.slice(0, i));
-        if (i >= text.length) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "ai", content: text, createdAt: "刚刚" }]);
-          if (convIdRef.current) sendAiMessage(convIdRef.current, "ai", text).catch(() => {});
-          setTyping(null);
-          setBusy(false);
-          resolve();
-        }
-      }, 22);
-    });
+  /** 让 AI 生成下一个采访问题并展示 + 持久化。 */
+  async function askQuestion() {
+    if (!convIdRef.current) {
+      setAiError("AI 暂时无法回应，请稍后再试。");
+      return;
+    }
+    setAiThinking(true);
+    setAiError(null);
+    try {
+      const { question } = await generateInterviewQuestion(convIdRef.current);
+      const q = question.trim();
+      setMessages((m) => [...m, { id: `ai-${Date.now()}`, role: "assistant", content: q, createdAt: "刚刚" }]);
+      sendAiMessage(convIdRef.current, "assistant", q).catch((e) => console.error("[interview] 保存 AI 消息失败", e));
+    } catch (e) {
+      console.error("[interview] AI 生成问题失败", e);
+      setAiError(
+        e instanceof Error && e.message.includes("AI_USAGE_LIMIT_REACHED")
+          ? "今日 AI 使用次数已达上限，请明天再试。"
+          : "AI 暂时无法回应，请稍后再试。"
+      );
+    } finally {
+      setAiThinking(false);
+    }
   }
 
   async function startInterview() {
@@ -170,55 +162,40 @@ export function WriteStudio() {
     setAnswers([]);
     setReady(false);
     setStoryContext(emptyLifeContext());
+    setAiError(null);
     const conv = await createAiConversation(topicName).catch(() => null);
     convIdRef.current = conv?.id ?? null;
-    await say(`你好，这是你的采访提纲。关于「${topicName}」，我会按顺序问你几个问题，你如实回答即可，不用纠结措辞。${QUESTIONS[0](topicName)}`);
+    await askQuestion();
   }
 
   async function sendAnswer() {
     const v = input.trim();
-    if (!v || busy || typing != null) return;
+    if (!v || aiThinking) return;
     setInput("");
-    const idx = answers.length;
+    // 用户原话独立保存（role=user），绝不被 AI 覆盖。
     setMessages((m) => [...m, { id: `u-${Date.now()}`, role: "user", content: v, createdAt: "刚刚" }]);
-    const next = [...answers, v];
-    setAnswers(next);
+    setAnswers((a) => [...a, v]);
 
-    // 持久化用户消息 + 抽取 Life Context（AI 记忆）
     if (convIdRef.current) sendAiMessage(convIdRef.current, "user", v).catch(() => {});
+    // 规则版人生档案抽取（保留现有能力，非完整 Memory Extraction）
     const ctx = extractLifeContext(v, storyContext);
     setStoryContext(ctx);
-    if (convIdRef.current) {
-      updateAiConversation(convIdRef.current, { storyContext: ctx, currentStep: idx + 1 }).catch(() => {});
-    }
+    if (convIdRef.current) updateAiConversation(convIdRef.current, { storyContext: ctx }).catch(() => {});
 
-    const isLast = idx >= QUESTIONS.length - 1;
-    if (isLast) {
-      await say("谢谢你的回答。下面我会把你的回答整理成一份初稿，你可以自由修改。");
-      setReady(true);
-    } else {
-      await say(QUESTIONS[idx + 1](topicLabel));
-    }
+    await askQuestion();
   }
 
-  function skip() {
-    if (busy) return;
-    const idx = answers.length;
-    const next = [...answers, "（此处略过）"];
-    setAnswers(next);
-    if (idx >= QUESTIONS.length - 1) {
-      setReady(true);
-    } else {
-      say(QUESTIONS[idx + 1](topicLabel));
-    }
+  /** 结束采访，进入「整理成初稿」流程。 */
+  function endInterview() {
+    if (aiThinking) return;
+    setReady(true);
   }
 
   function restart() {
-    if (timerRef.current) clearInterval(timerRef.current);
     setMessages([]);
     setAnswers([]);
-    setTyping(null);
-    setBusy(false);
+    setAiThinking(false);
+    setAiError(null);
     setReady(false);
     setInput("");
   }
@@ -423,7 +400,10 @@ export function WriteStudio() {
             {messages.map((m) => (
               <Bubble key={m.id} message={m} />
             ))}
-            {typing != null && <TypingBubble text={typing} />}
+            {aiThinking && <ThinkingBubble />}
+            {aiError && (
+              <p className="rounded-2xl bg-danger/10 px-4 py-2.5 text-sm text-danger">{aiError}</p>
+            )}
 
             {ready && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-center">
@@ -441,13 +421,13 @@ export function WriteStudio() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendAnswer()}
-                placeholder={busy ? "请稍候…" : "说点什么，越具体越好…"}
-                disabled={busy || ready}
+                placeholder={aiThinking ? "AI 正在思考…" : "说点什么，越具体越好…"}
+                disabled={aiThinking || ready}
                 className="h-10 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
               />
               <button
                 onClick={sendAnswer}
-                disabled={!input.trim() || busy || typing != null}
+                disabled={!input.trim() || aiThinking}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-inverse transition-colors hover:bg-primary-dark disabled:opacity-40"
                 aria-label="发送"
               >
@@ -455,22 +435,17 @@ export function WriteStudio() {
               </button>
             </div>
             <div className="flex items-center gap-3 text-xs text-subtle">
-              {busy && (
-                <button onClick={() => { if (timerRef.current) clearInterval(timerRef.current); setTyping(null); setBusy(false); }} className="flex items-center gap-1 hover:text-foreground">
-                  <Square className="h-3 w-3" /> 停止生成
-                </button>
-              )}
               {!ready && (
                 <>
-                  <button onClick={skip} disabled={busy} className="flex items-center gap-1 hover:text-foreground disabled:opacity-40">
-                    <SkipForward className="h-3 w-3" /> 跳过问题
-                  </button>
                   <button onClick={restart} className="flex items-center gap-1 hover:text-foreground">
                     <RefreshCw className="h-3 w-3" /> 重新采访
                   </button>
+                  <button onClick={endInterview} disabled={aiThinking} className="flex items-center gap-1 hover:text-foreground disabled:opacity-40">
+                    <Check className="h-3 w-3" /> 结束采访
+                  </button>
                 </>
               )}
-              <span className="ml-auto">{answers.length}/{QUESTIONS.length} 个问题</span>
+              <span className="ml-auto">已回答 {answers.length} 个问题</span>
             </div>
           </div>
         </div>
@@ -700,7 +675,7 @@ function blockToText(b: ContentBlock): string {
 }
 
 function Bubble({ message }: { message: AiMessage }) {
-  const ai = message.role === "ai";
+  const ai = message.role !== "user";
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("flex gap-2.5", ai ? "justify-start" : "justify-end")}>
       {ai && <Avatar name="采访" size="sm" className="bg-gradient-to-br from-[#5b8def] to-[#a06bf0]" />}
@@ -714,13 +689,14 @@ function Bubble({ message }: { message: AiMessage }) {
   );
 }
 
-function TypingBubble({ text }: { text: string }) {
+function ThinkingBubble() {
   return (
     <div className="flex gap-2.5">
       <Avatar name="采访" size="sm" className="bg-gradient-to-br from-[#5b8def] to-[#a06bf0]" />
-      <div className="max-w-[78%] rounded-2xl rounded-tl-md bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground ring-1 ring-divider">
-        {text}
-        <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary align-middle" />
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md bg-card px-4 py-3 text-sm text-subtle ring-1 ring-divider">
+        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.15s]" />
+        <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.3s]" />
       </div>
     </div>
   );
